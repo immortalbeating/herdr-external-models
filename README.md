@@ -1,8 +1,8 @@
 # Herdr External Models
 
-通过 Herdr 协调 Codex、Claude、OMP、Antigravity CLI（Agy）及 DSH 的 Agent Skill，补充任务记录、原生结果采集、验收和面板释放。
+[中文](README.md) | [English](README.en.md)
 
-An agent skill for coordinating external coding CLIs through Herdr, with task records, native response collection, review, and pane cleanup.
+通过 Herdr 协调 Codex、Claude、OMP、Antigravity CLI（Agy）及 DSH 的 Agent Skill，补充任务记录、原生结果采集、验收和面板释放。
 
 这是独立维护的辅助技能。Herdr 的基础操作由安装版本自带的 `herdr --skill` 提供，本仓库按需加载该指引；不捆绑或替代 Herdr、模型 CLI 和认证配置。
 
