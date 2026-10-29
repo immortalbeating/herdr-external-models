@@ -63,7 +63,7 @@ class NativeJobs(unittest.TestCase):
     def saved(self):
         return run.load(self.job / 'job.json')
 
-    def fake(self, spec, *args, raw=False):
+    def fake(self, spec, *args, raw=False, rpc_timeout=45):
         self.calls.append(args)
         if args[:2] == ('agent', 'get'):
             if self.gone:

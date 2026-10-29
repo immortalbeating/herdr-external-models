@@ -651,7 +651,7 @@ class Jobs(unittest.TestCase):
         job = self.agy_job([{"type": "USER_INPUT", "content": "Task %s. Read request-abc.md" % jid},
                             {"type": "PLANNER_RESPONSE", "content": "短"}])
         with patch.object(run, "AGY_BRAIN", self.work / "brain"):
-            out = run.collect(job)
+            out = run.collect(job, min_chars=200)
             with self.assertRaisesRegex(ValueError, "request-zzz.md"):
                 state = run.load(job / "job.json")
                 state["last_request"] = str(job / "request-zzz.md")
@@ -659,6 +659,20 @@ class Jobs(unittest.TestCase):
                 run.collect(job)
         self.assertEqual((out["collect"], out["result"]), ("none", None))
         self.assertFalse((job / "result.md").exists())
+
+    def test_short_agy_final_is_collected_by_default_and_explicit_length_is_explained(self):
+        jid = "20260101T000000Z-aaaaaaaaaaaa"
+        job = self.agy_job([{"type": "USER_INPUT", "content": "Task %s. Read request-abc.md" % jid},
+                            {"type": "PLANNER_RESPONSE", "content": "OK"}])
+        with patch.object(run, "AGY_BRAIN", self.work / "brain"):
+            accepted = run.collect(job)
+            self.assertEqual(accepted["collect"], "collected")
+            self.assertEqual((job / "result.md").read_text(encoding="utf-8").strip(), "OK")
+            short = run.collect(job, min_chars=200)
+        self.assertEqual((short["collect"], short["reason"], short["answer_chars"], short["min_chars"]),
+                         ("none", "answer_too_short", 2, 200))
+        self.assertIsNone(short["result"])
+        self.assertFalse(run.load(job / "job.json")["result_current"])
 
     def test_collect_refuses_to_guess_the_round_of_an_older_job(self):
         long = "第二轮答案" + "。" * 220

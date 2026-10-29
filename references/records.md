@@ -4,6 +4,8 @@
 
 每项任务的 `.agent-runs/<id>/job.json` 是状态来源。列表实时读取它，不维护第二份可漂移的总索引。`.agent-runs/.gitignore` 排除运行记录；记录含提示词和项目内容，仍属于本地敏感材料，不作为公开发布产物。
 
+`--job` 可给完整 job 目录，或给当前项目内的 job ID；从别处调用时用 `--workspace <项目目录>` 明确解析范围。只在该目录及其 Git 根的 `.agent-runs` 查找，缺失或多解时报错，不搜索其他项目。运行结果 JSON 写 stdout；失败返回非零并在 stderr 给出脱敏的一行摘要，重定向 stdout 时仍须核对退出码。
+
 Herdr 的 `.agent-runs` 位于解析后的 `project_root`，API/exec 仍位于执行目录。`herdr-layout.json` 只缓存布局关联，不保存任务完成状态；`.layout.lock` 只保护 Workspace/Tab/Pane 创建，超时后先确认锁内 PID 是否仍在工作，不盲目删除。`list --workspace` 同时检查传入目录及其 Git 根；非 Git 项目显式分组时传项目根即可。
 
 脚本对文本记录中的已知凭据环境变量值做脱敏，但这不是完整的敏感信息检测器；CLI 正在写入的流式日志及原样复制的附件尤其需要谨慎处理。提供材料前移除不相关秘密，发布或共享前检查导出内容。
@@ -37,7 +39,7 @@ python "<skill>/scripts/run.py" attach --job "<job-directory>" --file "<export.j
 - `cancel_requested`：已发送中断键，未证明停止。
 - `completed/needs_work`：主模型写入验收结论。
 
-Herdr 的 `agent_status` 单独保存，即使为 idle/done，也不自动修改为 completed。`status` 默认读取本地记录；`--refresh` 才读取 Herdr 当前状态。
+Herdr 的 `agent_status` 单独保存，即使为 idle/done，也不自动修改为 completed。开放 Herdr job 的 `status` 默认实时查询；`--cached` 读取本地，返回值注明 `status_source` 与最近 `agent_observed_at`。直接 API/exec、未启动或已关闭的 job 读取本地状态。
 
 收集并检查外部结果后，用含实际验证证据的本地文件收尾：
 
@@ -55,7 +57,7 @@ python "<skill>/scripts/run.py" finish --job "<job-directory>" --result-file "<c
 
 ### 收尾
 
-原有 `finish` 命令自动检查当前 job 的验收、结果和本地 Pane 关闭记录，写 `finish-check.json`，返回 `finish_check: ok|attention`。保留会话补问时不要求关闭；`--close`（DSH 为未传 `--keep-pane`）才核对关闭结果。报告不额外连接 Herdr，不关闭其他 job。
+原有 `finish` 命令自动检查当前 job 的验收、结果和本地 Pane 关闭记录，写 `finish-check.json`，返回 `finish_check: ok|attention`。保留会话补问时不要求关闭；`--close`（DSH 为未传 `--keep-pane`）才核对关闭结果。run.py 还在 `other_open_jobs` 提示同任务的其他已知未关闭记录，这是本地记录提示，不证明其进程存活，也不自动关闭它们。报告不额外连接 Herdr。
 
 任务或检查点结束时，在同一条 `finish` 命令附 `--related-job <已知相关job目录>`，可重复；同时核对这些记录。不扫描全项目历史，不维护第二份索引，调用者从原 Task 已有记录取得相关路径。发现未验收、记录缺失或要求关闭却未记完成时返回退出码 2；当前 job 已写的验收保留，不自动重派、改写其他 job 或强制清理。DSH 同名参数可混合核对两种记录；后继已复用的旧 DSH Pane 标记 superseded，不当成旧轮次未收尾。
 
@@ -63,7 +65,9 @@ python "<skill>/scripts/run.py" finish --job "<job-directory>" --result-file "<c
 
 只读审查的新 spec 可提供 `review_inputs: ["C:/project/被审查文件", "C:/project/本轮diff或证据清单"]` 和可选 `checkpoint_id`。也可在原 `run` 命令追加 `--review-input <文件>`（可重复）及 `--checkpoint-id <标识>`，不会多调用模型。只绑定明确文件及本轮请求，允许显式记录不存在的路径以识别新增/删除；不递归扫描目录、不解析清单后自动读取其全部成员。大资产优先引用项目已有冻结清单；覆盖范围以列出的文件为限，清单中的成员仍由项目工具核实。
 
-派发前记录 SHA-256，Herdr `collect`、API/exec 返回及 `finish` 时核对。内容变化或无法读取会保留旧结果但撤销 `result_current`，拒绝把它作为当前版本 completed。回执是取样时的字节摘要，不冻结工作区，也不证明范围外依赖未变化。需要追溯可用 `needs_work` 并显式 `--result-file` 登记原结果；新版本继续在原会话补问，不自动重跑。`followup` 默认继承原输入清单，传 `--review-input <文件>` 可更新本轮清单；`run` 的 `reuse` 按新 spec 决定是否绑定，省略清单就按普通咨询处理。两者每轮回执独立保留，新轮准备失败也不会沿用旧答案。
+派发前记录 SHA-256，Herdr `collect`、API/exec 返回及 `finish` 时核对。内容变化或无法读取会保留旧结果但撤销 `result_current`，拒绝把它作为当前版本 completed。回执是取样时的字节摘要，不冻结工作区，也不证明范围外依赖未变化。新版本继续在原会话补问，不自动重跑。`followup` 默认继承原输入清单，传 `--review-input <文件>` 可更新本轮清单；`run` 的 `reuse` 按新 spec 决定是否绑定，省略清单就按普通咨询处理。两者每轮回执独立保留，新轮准备失败也不会沿用旧答案。
+
+仅为留存已过期的本轮答案，可显式 `collect --accept-changed`。它只放行输入摘要明确 changed，仍检查原生身份、工作目录、当前请求和最终答案；unavailable 不放行。答案与回执分别写 `result-stale-<request>.md`、`result-receipt-stale-<request>.json`，回执标记 `inputs_changed`，状态保持待处理且 `result_current: false`，返回非零提醒复核。之后可用 `finish --outcome needs_work --review-file ...` 收尾该保留结果；`completed` 仍拒绝。已有手工导出的答案也可用 needs_work 加显式 `--result-file` 登记。Task 的写回若改变送审输入，按此留存并说明，不把新写回伪装成原审查版本。
 
 未启用时没有哈希扫描；旧 job 仍可验收，但没有历史绑定，不能事后补造。此绑定目前用于 `run.py` 的只读审查路径，不套到会正常修改输入的实现任务或 DSH headless 参数上。`elapsed_ms` 记录本地检查耗时，不能当作模型耗时或调用收益证明。
 

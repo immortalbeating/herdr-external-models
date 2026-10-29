@@ -65,6 +65,8 @@ Claude/OMP/Agy 入口于 2026-10-28 核对本机帮助；这只是入口核实�
 
 Windows 下脚本优先解析 npm 安装中的原生 `codex.exe`，避免 shell shim 改写参数。安装布局不同或存在多个候选时，将 `CODEX_EXECUTABLE` 设置为实际原生可执行文件路径；不会猜测另一个安装版本。
 
+Windows 的沙箱 Codex spec 若首先解析到 WindowsApps 中的 Store/MSIX PowerShell，run/dry-run 给出兼容性警告；它不证明所有版本必然失败，也不修改 PATH、全局配置或权限。若产物已生成但 CLI 的复制进程失败，可用 [Codex 图片恢复](native-clis.md#codex-图片恢复) 在宿主显式取回原图并记录摘要。
+
 兼容性快照（2026-10-28，Windows、Codex CLI 0.162.1、Python 3.14）：`workspace-write` 中，通过 `--add-dir` 放行的根下，`tempfile.mkdtemp()` 的 0700 受保护 DACL 仍可能阻止受限令牌写入。这是执行环境失败，不能计作任务断言失败，换成 Herdr TUI 不改变它。可控测试工具可在获准根下用继承 ACL 的独占工作目录（Windows 普通 mkdir）；必须使用未修改 tempfile 时，按已有授权选择明确的无沙箱 spec 并继续隔离 APPDATA。保留原始失败证据，不修改业务工具或全局 ACL 来掩盖问题；升级后重新验证，不能将该快照当作所有版本的结论。
 
 需要继续该 CLI 会话时，先确认原进程已经退出，使用记录中的 ID 和本机 `codex exec resume --help`；不要使用模糊的 `--last`。新一轮需留档，可转入 Herdr：启动同一 Codex 原生会话的 resume 命令，并在新任务 spec 的 `related_job` 指回原 job。不同时恢复一个会话给多个写入者。

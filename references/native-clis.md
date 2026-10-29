@@ -27,7 +27,9 @@ OMP spec 示例（替换为已配置的 provider/model；写入任务另列 `wri
 
 `--tools` 限制内置工具，不代表关闭 MCP/扩展。Bash/写文件任务按范围选择工具与批准模式，记录真实措施。列表里有本次会话不可用的内置工具时，OMP 启动即退出（`Built-in tool unavailable in this session`）；Herdr 只报 `timed out waiting for agent startup`，`run` 会把可读取的面板末尾附在错误里并记 `agent_start_failed`。
 
-部分内置工具还依赖模型或 judge 配置。遇到 `find` 等工具不可用时，先核对当前版本与配置；路径匹配可选择已确认可用的 `glob`，内容搜索可选择 `grep`。升级或更换渠道后重新核对工具资格。
+部分内置工具还依赖模型或 judge 配置。遇到 find 等工具不可用时，先核对当前版本与配置；路径匹配可选择已确认可用的 glob，内容搜索可选择 grep。升级或更换渠道后重新核对工具资格。
+
+spec 的 `--tools` 含 `find` 时，run/dry-run 提供配置依赖警告，不对所有模型或未来版本一律拒绝。警告不替代真实能力验证，也不自动更换工具或渠道。
 
 按入口的能力验证规则检查本次实际使用的工具：只读任务覆盖读取与检索；执行任务增加创建、编辑和命令运行。工具名可用不等于本次确已调用。
 
@@ -112,7 +114,17 @@ Herdr 直接启动可执行文件，可能不执行 PowerShell 同名包装函�
 
 `collect` 刷新身份后，读取精确会话的 `~/.gemini/antigravity-cli/brain/<原生会话ID>/.system_generated/logs/transcript_full.jsonl`（`AGY_BRAIN_DIR` 可改根）。用 job ID 和 `last_request` 文件名定位 USER_INPUT，仅检查其后到下一输入前的区间。区间内最后 planner 须 DONE、有正文且无工具调用/错误，也无运行或错误尾部；GENERIC 工具结果和半行 JSONL 不作答案。该区间可能不是原生会话最后一轮。
 
-默认最短 200 字，短验证显式 `--min-chars 1`。`--request` 不覆盖已记录的当前请求，旧 job 缺失轮次记录时才补选。失败撤销旧 `result_current`，保留旧文件追溯。计划文件只列路径；手工确认后可用 `finish --result-file` 登记，不替 Agy 按“Proceed”。
+默认最短 1 字，与其他原生 CLI 一致；需要长度门槛时显式 `--min-chars`，不足时返回 `answer_too_short`、实际长度和阈值。`--request` 不覆盖已记录的当前请求，旧 job 缺失轮次记录时才补选。失败撤销旧 `result_current`，保留旧文件追溯。计划文件只列路径；手工确认后可用 `finish --result-file` 登记，不按 mtime 或“最后一个 Markdown”自动替代本轮答案，也不替 Agy 按“Proceed”。
+
+## Codex 图片恢复
+
+Codex 原图因工具进程失败未复制时，可由宿主显式选取原图，保留源文件并记录 SHA-256：
+
+```powershell
+python "<skill>/scripts/run.py" collect-artifacts --job "<job>" --source "<CODEX_HOME>/generated_images/<精确会话UUID>/exec-<id>.png"
+```
+
+`--source` 可重复；只接受该 job 绑定会话目录中的明确 PNG，默认复制到 job 的 `artifacts/codex-images/<UUID>/`。同内容重复执行复用，目标内容不同时拒绝覆盖。需要复制到项目输出目录时，在 spec 用 `artifact_output_dirs` 列出获准绝对目录，再传 `--destination`；不把自然语言 `write_scope` 当路径解析，也不凭 SOURCE.txt、回答中的路径或目录里全部图片猜测本轮交付。此命令同时支持 Codex exec 与 Herdr，文本结果采集仍沿用各自路径。
 
 ## 释放与来源
 

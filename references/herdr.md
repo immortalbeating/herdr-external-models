@@ -82,7 +82,20 @@ python "<skill>/scripts/run.py" cancel --job "<job>"
 
 `read` 默认被动读取 visible 并返回快照路径，长历史可选 recent/recent-unwrapped；完整答案优先用 [原生按轮采集](native-clis.md)。`followup` 只对匹配身份的 idle/done 会话发送。`cancel` 向匹配 agent 发 Ctrl+C，记录 `cancel_requested` 后仍须确认停止。
 
-超时不证明未投递；Herdr 的等待观察生命周期，不能证明特定任务或后台子任务已完成。通过 job/请求标记、原生最终答案与产物确认结果，验收格式见 [记录与验收](records.md)。
+开放 Herdr job 的 `status` 默认实时核对，返回 `status_source: live` 和 `agent_observed_at`；`--refresh` 保留为显式写法。离线查记录用 `status --cached`。已关闭、未启动或非 Herdr job 只需读本地。实时 `agent_status` 与任务验收 `status` 分开：idle/done 不自动变为 completed。
+
+### 等待
+
+```powershell
+python "<skill>/scripts/run.py" wait --job "<job>" --timeout 600 --collect
+python "<skill>/scripts/run.py" wait --job "<job-A>" --job "<job-B>" --all --timeout 600 --interval 20 --collect
+```
+
+`wait` 默认在任一 job 变为 idle/done/closed 时返回，`--all` 等全部；它逐次核对同一任务和原生身份，轮询间不持 job 锁。`--collect` 还要求按当前请求采集到有效最终答案，避免等待一个尚未由 collect 生成的 `result.md`，也不会把旧文件误作本轮结果。默认每 20 秒检查，实际响应时间还包括查询与采集耗时；轮询不生成面板快照。
+
+blocked/unknown、身份或请求变化、查询错误及时返回待处理；超时返回非零，保留正在执行的任务，不取消、不重发、不自动验收或关闭。等待中的变更输入留存选项与普通 collect 相同，见 [审查输入版本](records.md#审查输入版本)。DSH 用自己的 `status --wait`，不混入此命令。
+
+超时不证明未投递；Herdr 的等待观察生命周期，不能证明特定任务或后台子任务已完成。`agent_prompt_stalled` 也表示提示可能已经投递：脚本保留请求并被动核对同一身份，观察到 working 可继续等；其他情况报告不确定，再用 wait/collect 核对本轮，绝不自动重发。通过 job/请求标记、原生最终答案与产物确认结果，验收格式见 [记录与验收](records.md)。
 
 只读审查的输入绑定与 `finish --related-job` 收尾核对见 [轻量核对](records.md#轻量核对)；普通咨询保持原命令，不为核对再开模型或全量扫描。
 
@@ -100,7 +113,7 @@ python "<skill>/scripts/run.py" prune --workspace "<project>"
 - **身份与忙碌**：`close` 仅关闭该 job 仍拥有的 terminal/pane，原生身份存在时也核对。working/blocked 默认拒绝；`--force` 只用于用户已授权的中断。明确 agent_not_found 的自有 shell 可关闭，查询错误、被替换身份或其他活跃 agent 则拒绝。
 - **布局与记录**：检查和关闭持项目布局锁，释放后重查，Tab 确认空才关闭并更新映射。失败不记为已关闭，重试可完成空 Tab 收尾；job、结果、原生 ID 保留。部分创建失败也保存已分配的布局 ID，供后续检查释放。
 - **Codex 归档**：辅助关闭成功后归档绑定的原生会话；失败与重试见[关闭后归档](native-clis.md#关闭后归档)。
-- **遗留检查**：`list --open` 实时核对记录。`pane_live: false` 可经 `close` 补记关闭；null 表示未查明。按 task 批量关闭独立处理各 job，有拒绝则退出码 2。`prune` 仅删除不存在的布局映射，不关闭实际布局。
+- **遗留检查**：`list --open` 实时核对记录。`pane_live: false` 可经 `close` 补记关闭；null 表示未查明。按 task 批量关闭独立处理各 job，有拒绝则退出码 2。`prune` 清理过期映射，并对同一服务中已确认 terminal 不存在的 run.py job 再核实、补记关闭；重新出现的 terminal、其他服务、身份或查询不明的记录保留。它不主动关闭仍存在的 Pane，Codex 补记关闭后沿用精确会话归档。
 - **任务结束**：连通测试沿用所属任务的稳定 `task_id`；任务结束时，用已有 `task_key` 执行上面的批量 `close`，覆盖测试、正式派单及启动失败留下的自有 Pane，再用 `list --open --task-key <task_key>` 核对。保留会话继续复查时不执行这次批量释放。DSH 记录由 `dsh.py` 收尾，批量扫描跳过它们；其他无法解析的记录逐项报错，仍处理有效 job，整批返回退出码 2。
 - **异常收尾**：`collect: none` 或等待超时后先查原生记录和 Pane；从 Pane 取得有效答案时，保存文件并用 `finish --result-file ... --review-file ... --outcome ... --close` 登记。任务取消或启动失败且没有有效答案时，用 `close --job` 释放并保留错误记录。无法确认已结束、仍忙碌或身份不符时报告具体 job，保留待处理，不以 `--force` 兜底。布局已经不存在时也用 `close` 补记，再按需 `prune`。
 - **断线与恢复**：前台断开可以保留进程，server 重启会结束旧进程并可能通过 integration 恢复原生对话。OMP/Claude 的显式 `recover` 见 [原生 CLI](native-clis.md)；其他 CLI 核对原生会话后建立带 `related_job` 的关联记录，不猜测绑定、不自动重发。

@@ -28,6 +28,7 @@ Python 3.11+，仅标准库。`<skill>` 解析到当前技能目录；spec 内�
 ```powershell
 python "<skill>/scripts/run.py" run --spec "<spec.json>" --prompt-file "<task.md>" --dry-run
 python "<skill>/scripts/run.py" run --spec "<spec.json>" --prompt-file "<task.md>"
+python "<skill>/scripts/run.py" wait --job "<job-directory>" --timeout 600 --collect
 python "<skill>/scripts/run.py" status --job "<job-directory>"
 python "<skill>/scripts/run.py" collect --job "<job-directory>"
 python "<skill>/scripts/run.py" finish --job "<job-directory>" --review-file "<review.md>" --outcome completed --close

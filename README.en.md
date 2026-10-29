@@ -13,6 +13,7 @@ This is an independently maintained companion skill. It loads the official guide
 - **Other routes:** independent `codex exec`, direct APIs compatible with Responses or Chat Completions, and a DSH headless adapter running inside a Herdr Pane.
 - **Review and cleanup:** store requests, results, reviews, and status under the project's `.agent-runs` directory. Release owned panes after checking identity and runtime state; after successfully closing a Codex pane, archive its exact native session.
 - **Leftover checks:** handle connectivity tests, regular assignments, and failed attempts by task. DSH and regular job records can coexist; one unreadable record does not prevent other valid jobs from being released.
+- **Shared waiting and recovery:** live status and bounded waits across jobs, with optional collection of the current answer; explicitly retain stale results or recover selected Codex images with SHA-256 receipts.
 
 `finish` records the caller's review. A CLI reporting idle/done does not prove that a project task passed. See [release and recovery](references/herdr.md#释放与恢复) for collection or startup failures. The controller must still execute cleanup commands; this skill does not run a background cleanup service.
 
@@ -49,12 +50,17 @@ Start with [SKILL.md](SKILL.md) for the complete operating rules. In the command
 ```powershell
 python "<skill>/scripts/run.py" run --spec "<spec.json>" --prompt-file "<task.md>" --dry-run
 python "<skill>/scripts/run.py" run --spec "<spec.json>" --prompt-file "<task.md>"
+python "<skill>/scripts/run.py" wait --job "<job-directory>" --timeout 600 --collect
 python "<skill>/scripts/run.py" status --job "<job-directory>"
 python "<skill>/scripts/run.py" collect --job "<job-directory>"
 python "<skill>/scripts/run.py" finish --job "<job-directory>" --review-file "<review.md>" --outcome completed --close
 ```
 
 DSH uses its own lifecycle in `scripts/dsh.py`; see the reference below for commands. After changing a model, permission policy, or tool configuration, validate the capabilities required by the task in an isolated directory.
+
+For open Herdr jobs, `status` now refreshes live state by default; use `--cached` for offline records. Repeat `--job` with `wait`, and use `--all` to wait for every job. `--collect` waits for a valid answer from the current round. Timeouts do not cancel or resubmit work. Job IDs can be resolved with `--workspace`. Failure JSON remains on stdout, with a readable error summary on stderr.
+
+When inputs have changed, `collect --accept-changed` only retains an explicitly marked stale answer; it cannot approve it as completed. `prune` can reconcile records for terminals confirmed absent on the same server, while preserving live or uncertain panes. Image recovery requires explicit sources and destination scope; see [Codex image recovery](references/native-clis.md#codex-图片恢复).
 
 | Topic | Reference |
 | --- | --- |

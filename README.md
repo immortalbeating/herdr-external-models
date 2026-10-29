@@ -13,6 +13,7 @@
 - **其他路径**：独立 `codex exec`、兼容 Responses / Chat Completions 的直接 API，以及 Herdr Pane 中的 DSH headless 适配。
 - **验收与收尾**：项目 `.agent-runs` 保存请求、结果、验收与状态；确认归属和运行状态后释放自有面板，成功关闭 Codex 面板后归档其精确原生会话。
 - **遗留检查**：按任务处理连通测试、正式调用和失败尝试；兼容 DSH 与普通 job 混合存放，单个坏记录不会中断其他有效任务的释放。
+- **统一等待与恢复**：实时状态与有界多任务等待，按需自动采集本轮答案；显式留存过期结果，或取回指定的 Codex 原图并记录 SHA-256。
 
 `finish` 是调用者的验收记录，CLI 的 idle/done 不是项目通过证明。采集或启动失败的收尾见 [释放与恢复](references/herdr.md#释放与恢复)；主控仍需执行收尾命令，本技能不运行后台定时回收。
 
@@ -49,12 +50,17 @@ Claude Code 可放到 `~/.claude/skills/herdr-external-models`。也可让多个
 ```powershell
 python "<skill>/scripts/run.py" run --spec "<spec.json>" --prompt-file "<task.md>" --dry-run
 python "<skill>/scripts/run.py" run --spec "<spec.json>" --prompt-file "<task.md>"
+python "<skill>/scripts/run.py" wait --job "<job-directory>" --timeout 600 --collect
 python "<skill>/scripts/run.py" status --job "<job-directory>"
 python "<skill>/scripts/run.py" collect --job "<job-directory>"
 python "<skill>/scripts/run.py" finish --job "<job-directory>" --review-file "<review.md>" --outcome completed --close
 ```
 
 DSH 使用 `scripts/dsh.py` 的独立生命周期，具体命令见下表。模型、权限或工具配置改变后，应在隔离目录验证任务实际需要的能力。
+
+开放 Herdr job 的 `status` 默认实时查询，离线读取用 `--cached`。`wait` 可重复传 `--job`，用 `--all` 等待全部；`--collect` 等到本轮有效答案已回收，超时不取消或重发。job ID 可配合 `--workspace` 使用。失败 JSON 保留在 stdout，stderr 提供错误摘要。
+
+输入已经变化时，`collect --accept-changed` 只留存带标记的过期答案，不能验收为 completed。`prune` 可补记同一服务中已确认消失的面板记录，仍存在或身份不明的面板保留。图片复制使用明确来源和目标范围，详见 [Codex 图片恢复](references/native-clis.md#codex-图片恢复)。
 
 | 内容 | 入口 |
 | --- | --- |

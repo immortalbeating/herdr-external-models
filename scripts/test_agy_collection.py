@@ -97,7 +97,7 @@ class AgyCollectionTests(unittest.TestCase):
     def test_collect_observes_identity_before_requiring_a_lazy_session_id(self):
         self.state.update(pane_closed=False, agent_name='agy-job-1', native_session=None)
         run.save(self.job / 'job.json', self.state)
-        def observed(job, state):
+        def observed(job, state, rpc_timeout=45):
             state['native_session'] = {'kind': 'id', 'agent': 'agy', 'value': SID}
             return {'agent_status': 'idle'}
         with patch.object(run, 'observe', side_effect=observed) as query:
